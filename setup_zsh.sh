@@ -15,18 +15,21 @@ Y="\033[33m"; G="\033[32m"; R="\033[31m"; B="\033[34m"; X="\033[0m"
 usage() {
   cat <<EOF
 ${B}Portable Zsh setup${X}
-Usage: $0 [--force] [--no-install]
+Usage: $0 [--force] [--no-install] [--no-font]
   --force       Overwrite existing ~/.zshrc
   --no-install  Do not install Oh My Zsh or plugins; only place template
+  --no-font     Skip Meslo Nerd Font installation
 EOF
 }
 
 FORCE=0
 NOINSTALL=0
+NOFONT=0
 while [ "${1:-}" != "" ]; do
   case "$1" in
     --force) FORCE=1 ;;
     --no-install) NOINSTALL=1 ;;
+    --no-font) NOFONT=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo -e "${R}Unknown option: $1${X}"; usage; exit 1 ;;
   esac
@@ -83,6 +86,41 @@ install_components() {
   ensure_theme powerlevel10k https://github.com/romkatv/powerlevel10k.git
 }
 
+install_meslo_font_macos() {
+  if [ "$OS" != "Darwin" ]; then return; fi
+  echo -e "${Y}Installing Meslo Nerd Font via Homebrew cask...${X}"
+  if ! command -v brew >/dev/null 2>&1; then
+    echo -e "${R}Homebrew not found. Install Homebrew or run font install manually.${X}"
+    return
+  fi
+  brew tap homebrew/cask-fonts || true
+  brew install --cask font-meslo-lg-nerd-font || true
+  echo -e "${G}Meslo Nerd Font installed. Set your terminal font to 'MesloLGS NF'.${X}"
+}
+
+install_meslo_font_linux() {
+  if [ "$OS" = "Darwin" ]; then return; fi
+  echo -e "${Y}Installing Meslo Nerd Font (user-level) on Linux...${X}"
+  local fontdir="$HOME/.local/share/fonts"
+  mkdir -p "$fontdir"
+  for name in "MesloLGS NF Regular.ttf" "MesloLGS NF Bold.ttf" "MesloLGS NF Italic.ttf" "MesloLGS NF Bold Italic.ttf"; do
+    url="https://github.com/romkatv/powerlevel10k-media/raw/master/${name// /%20}"
+    echo -e "${Y}Downloading $name...${X}"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$url" -o "$fontdir/$name"
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q "$url" -O "$fontdir/$name"
+    else
+      echo -e "${R}Neither curl nor wget found. Skipping font download.${X}"
+      return
+    fi
+  done
+  if command -v fc-cache >/dev/null 2>&1; then
+    fc-cache -fv "$fontdir" || true
+  fi
+  echo -e "${G}Meslo Nerd Font installed (user-level). Select 'MesloLGS NF' in your terminal settings.${X}"
+}
+
 # Place template
 place_template() {
   if [ -f "$TARGET_ZSHRC" ] && [ "$FORCE" -ne 1 ]; then
@@ -100,6 +138,14 @@ if [ "$NOINSTALL" -ne 1 ]; then
 else
   echo -e "${Y}Skipping Oh My Zsh & plugin/theme installation (--no-install).${X}"
 fi
+
+if [ "$NOFONT" -ne 1 ]; then
+  install_meslo_font_macos
+  install_meslo_font_linux
+else
+  echo -e "${Y}Skipping font installation (--no-font).${X}"
+fi
+
 place_template
 
 # Inform user to reload
@@ -110,6 +156,5 @@ ${B}Next steps:${X}
   2) Start a new shell or run: ${G}source ~/.zshrc${X}
   3) Run the Powerlevel10k wizard: ${G}p10k configure${X} (creates ~/.p10k.zsh)
   4) Verify plugins with the provided script: ${G}./verify_zsh_plugins.sh${X}
-EOM
-``
+   5) In your terminal prefs, set font to ${G}MesloLGS NF${X}.
 
